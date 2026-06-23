@@ -11,10 +11,7 @@ Illustrations are fetched from the cutout API and rendered with the bird's commo
 
 **Plugin settings**
 
-Strategy: Polling
-Polling URL: https://api.ebird.org/v2/data/obs/US-NC-119/recent?maxResults=12&back=7
-Polling Header: x-ebirdapitoken=YOUR_EBIRD_API_KEY
-No-bleed padding: Yes
+Strategy: Polling | Polling URL: https://api.ebird.org/v2/data/obs/US-NC-119/recent?maxResults=12&back=7 | Polling Header: x-ebirdapitoken=YOUR_EBIRD_API_KEY | No-bleed padding: Yes
 
 **Getting an eBird API key**
 
@@ -39,9 +36,4 @@ Currently set to US-NC-119 (Mecklenburg County, NC). To change region, update th
 
 **Layout**
 
-Canvas: 800 × 480 px
-Collage area: 800 × 450 px (below 30px title bar)
-Max birds: 12
-Largest bird: 120px
-Smallest bird: 52px
-Spiral bias: Horizontal (x × 1.7)
+Canvas: 800 × 480 px | Collage area: 800 × 450 px (below 30px title bar) | Max birds: 12 | Largest bird: 120px | Smallest bird: 52px | Spiral bias: Horizontal (x × 1.7)
