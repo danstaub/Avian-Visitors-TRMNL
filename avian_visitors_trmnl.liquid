@@ -1,0 +1,292 @@
+{% comment %}
+  Avian Visitors — TRMNL OG Private Plugin
+  ==========================================
+  Screen: 800 × 480 px, 1-bit ePaper (grayscale-safe)
+
+  SETUP
+  -----
+  Strategy : Polling
+  Polling URL:
+    https://api.ebird.org/v2/data/obs/geo/recent
+      ?lat=##{{ lat }}
+      &lng=##{{ lng }}
+      &dist=##{{ dist }}
+      &back=##{{ back }}
+      &maxResults=50
+      &key=##{{ ebird_api_key }}
+  Polling Headers: (none needed — key is in URL)
+  No-bleed padding: YES (edge-to-edge image)
+
+  FORM FIELDS (settings.yml)
+  --------------------------
+  - keyname: ebird_api_key
+    field_type: string
+    name: eBird API Key
+    description: Get a free key at https://ebird.org/api/keygen
+  - keyname: lat
+    field_type: string
+    name: Latitude
+    description: Your location latitude (e.g. 35.2271)
+    default: '35.2271'
+  - keyname: lng
+    field_type: string
+    name: Longitude
+    description: Your location longitude (e.g. -80.8431)
+    default: '-80.8431'
+  - keyname: dist
+    field_type: select
+    name: Search Radius (km)
+    options: ['5','10','25','50']
+    default: '25'
+  - keyname: back
+    field_type: select
+    name: Days Back
+    options: ['1','3','7','14','30']
+    default: '7'
+
+  MERGE VARIABLES
+  ---------------
+  IDX_0 = array of eBird observation objects:
+    { comName, sciName, speciesCode, howMany, obsDt, ... }
+{% endcomment %}
+
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body, html {
+    width: 800px;
+    height: 480px;
+    overflow: hidden;
+    background: #fff;
+    font-family: 'Georgia', 'Times New Roman', serif;
+  }
+
+  #canvas {
+    position: relative;
+    width: 800px;
+    height: 480px;
+    background: #fff;
+  }
+
+  /* Title bar — ink-brush feel */
+  #title-bar {
+    position: absolute;
+    top: 0; left: 0;
+    width: 800px;
+    padding: 6px 14px 4px;
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    border-bottom: 2px solid #000;
+    background: #fff;
+    z-index: 10;
+  }
+  #title-bar .title {
+    font-size: 15px;
+    font-weight: bold;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+  #title-bar .subtitle {
+    font-size: 9px;
+    letter-spacing: 0.06em;
+    opacity: 0.55;
+  }
+
+  /* Collage area */
+  #collage {
+    position: absolute;
+    top: 30px; left: 0;
+    width: 800px;
+    height: 450px;
+    overflow: hidden;
+  }
+
+  .bird-tile {
+    position: absolute;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-end;
+  }
+
+  .bird-tile img {
+    display: block;
+    object-fit: contain;
+    /* ePaper-safe: keep images as-is, they arrive already dithered/silhouette */
+    image-rendering: pixelated;
+  }
+
+  .bird-label {
+    font-size: 7px;
+    letter-spacing: 0.04em;
+    text-align: center;
+    line-height: 1.2;
+    max-width: 100%;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    color: #000;
+    margin-top: 1px;
+  }
+
+  /* Empty state */
+  #empty {
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    text-align: center;
+    font-size: 13px;
+    opacity: 0.4;
+    letter-spacing: 0.08em;
+  }
+</style>
+
+<div id="canvas">
+  <div id="title-bar">
+    <span class="title">Avian Visitors</span>
+    <span class="subtitle">RECENT LOCAL SIGHTINGS · EBIRD</span>
+  </div>
+
+  <div id="collage">
+    {% if IDX_0 and IDX_0.size > 0 %}
+      {%- comment -%}
+        Bird tiles are placed by JS below, which handles:
+        - dedup by speciesCode (keep highest howMany)
+        - center-out spiral placement
+        - sizing by frequency rank
+        - fetching cutout images from bird.onethreenine.net
+      {%- endcomment -%}
+      <div id="bird-data" style="display:none">{{ IDX_0 | json }}</div>
+    {% else %}
+      <div id="empty">No recent sightings found.<br>Check your eBird API key and location.</div>
+    {% endif %}
+  </div>
+</div>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+  var rawEl = document.getElementById("bird-data");
+  if (!rawEl) return;
+
+  var obs;
+  try { obs = JSON.parse(rawEl.textContent || rawEl.innerText); }
+  catch(e) { return; }
+
+  // 1. Deduplicate — keep most-seen per species
+  var speciesMap = {};
+  obs.forEach(function(o) {
+    var key = o.speciesCode;
+    if (!speciesMap[key]) {
+      speciesMap[key] = { comName: o.comName, sciName: o.sciName, speciesCode: key, count: 0 };
+    }
+    speciesMap[key].count += (parseInt(o.howMany) || 1);
+  });
+
+  // 2. Sort by count descending, cap at 20 species
+  var birds = Object.values(speciesMap)
+    .sort(function(a,b){ return b.count - a.count; })
+    .slice(0, 20);
+
+  if (birds.length === 0) return;
+
+  // 3. Size tiers: rank 0 = largest, diminishing
+  // Collage area: 800 x 450, center = (400, 235)
+  var AREA_W = 800, AREA_H = 450;
+  var CX = AREA_W / 2, CY = AREA_H / 2;
+
+  // Image sizes by rank (px, square bounding box for img)
+  var MAX_SZ = 140, MIN_SZ = 48;
+  var sizes = birds.map(function(_, i) {
+    var t = birds.length === 1 ? 0 : i / (birds.length - 1);
+    return Math.round(MAX_SZ - t * (MAX_SZ - MIN_SZ));
+  });
+
+  // 4. Spiral placement outward from center
+  // Each slot: (x, y) = center of tile
+  var placed = []; // {x, y, sz}
+
+  function overlaps(nx, ny, nsz) {
+    var pad = 4;
+    for (var p = 0; p < placed.length; p++) {
+      var dx = nx - placed[p].x, dy = ny - placed[p].y;
+      var minDist = (nsz + placed[p].sz) / 2 + pad;
+      if (Math.sqrt(dx*dx + dy*dy) < minDist) return true;
+    }
+    return false;
+  }
+
+  function inBounds(x, y, sz) {
+    return x - sz/2 >= 0 && x + sz/2 <= AREA_W &&
+           y - sz/2 >= 0 && y + sz/2 <= AREA_H;
+  }
+
+  var slots = [];
+  birds.forEach(function(bird, i) {
+    var sz = sizes[i];
+    if (i === 0) {
+      // Center
+      slots.push({ x: CX, y: CY, sz: sz });
+      placed.push({ x: CX, y: CY, sz: sz });
+      return;
+    }
+
+    // Archimedean spiral search
+    var found = false;
+    for (var angle = 0; angle < Math.PI * 20 && !found; angle += 0.25) {
+      var r = 12 * angle;
+      // randomize angle start per bird to avoid clustering
+      var a = angle + (i * 2.399); // golden angle offset
+      var tx = CX + r * Math.cos(a);
+      var ty = CY + r * Math.sin(a);
+      if (inBounds(tx, ty, sz) && !overlaps(tx, ty, sz)) {
+        slots.push({ x: tx, y: ty, sz: sz });
+        placed.push({ x: tx, y: ty, sz: sz });
+        found = true;
+      }
+    }
+    if (!found) {
+      // fallback: skip this bird
+      slots.push(null);
+    }
+  });
+
+  // 5. Render tiles
+  var collage = document.getElementById("collage");
+  var BASE = "https://bird.onethreenine.net/avian/api/cutout.php";
+
+  birds.forEach(function(bird, i) {
+    var slot = slots[i];
+    if (!slot) return;
+
+    var sz = slot.sz;
+    var tile = document.createElement("div");
+    tile.className = "bird-tile";
+    tile.style.left  = (slot.x - sz/2) + "px";
+    tile.style.top   = (slot.y - sz/2) + "px";
+    tile.style.width  = sz + "px";
+    tile.style.height = (sz + 10) + "px"; // +10 for label
+
+    var img = document.createElement("img");
+    var sci = encodeURIComponent(bird.sciName);
+    var com = encodeURIComponent(bird.comName);
+    // Alternate perched/flight by index for visual variety
+    var pose = (i % 3 === 2) ? "flight" : "perched";
+    img.src = BASE + "?sci=" + sci + "&com=" + com + "&pose=" + pose;
+    img.width  = sz;
+    img.height = sz;
+    img.alt    = bird.comName;
+    // On error: hide gracefully
+    img.onerror = function() { tile.style.display = "none"; };
+
+    var label = document.createElement("div");
+    label.className = "bird-label";
+    label.textContent = bird.comName;
+    label.style.maxWidth = sz + "px";
+
+    tile.appendChild(img);
+    tile.appendChild(label);
+    collage.appendChild(tile);
+  });
+});
+</script>
