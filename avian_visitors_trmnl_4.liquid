@@ -1,0 +1,225 @@
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body, html {
+    width: 800px;
+    height: 480px;
+    overflow: hidden;
+    background: #fff;
+    font-family: 'Georgia', 'Times New Roman', serif;
+  }
+  #canvas {
+    position: relative;
+    width: 800px;
+    height: 480px;
+    background: #fff;
+  }
+  #title-bar {
+    position: absolute;
+    top: 0; left: 0;
+    width: 800px;
+    padding: 6px 14px 4px;
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    border-bottom: 2px solid #000;
+    background: #fff;
+    z-index: 10;
+  }
+  #title-bar .title {
+    font-size: 15px;
+    font-weight: bold;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+  #title-bar .subtitle {
+    font-size: 9px;
+    letter-spacing: 0.06em;
+    opacity: 0.55;
+  }
+  #collage {
+    position: absolute;
+    top: 30px; left: 0;
+    width: 800px;
+    height: 450px;
+    overflow: hidden;
+  }
+  .bird-tile {
+    position: absolute;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-end;
+  }
+  .bird-tile img {
+    display: block;
+    object-fit: contain;
+  }
+  .bird-label {
+    font-size: 7px;
+    letter-spacing: 0.04em;
+    text-align: center;
+    line-height: 1.2;
+    max-width: 100%;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    color: #000;
+    margin-top: 1px;
+  }
+</style>
+
+<div id="canvas">
+  <div id="title-bar">
+    <span class="title">Avian Visitors</span>
+    <span class="subtitle">MECKLENBURG COUNTY · EBIRD · PAST 7 DAYS</span>
+  </div>
+  <div id="collage">
+    <div id="bird-data" style="display:none">{% for bird in birds %}{{ bird.comName }}|{{ bird.sciName }}|{{ bird.howMany }}{% unless forloop.last %},{% endunless %}{% endfor %}</div>
+  </div>
+</div>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+  var raw = document.getElementById("bird-data").textContent.trim();
+  if (!raw) return;
+
+  var birds = raw.split(",").map(function(entry) {
+    var parts = entry.split("|");
+    return {
+      comName: parts[0] || "",
+      sciName: parts[1] || "",
+      count: Math.max(1, parseInt(parts[2]) || 1)
+    };
+  }).filter(function(b) { return b.comName && b.sciName; });
+
+  if (birds.length === 0) return;
+
+  var AW = 800, AH = 450;
+  var CX = AW / 2, CY = AH / 2;
+  var N = birds.length;
+
+  // Viewport area budget: 28–46% depending on species count
+  var budgetFrac = 0.28 + (Math.max(0, 12 - N) / 12) * 0.18;
+  var B = AW * AH * budgetFrac;
+
+  // Score each bird with 0.65 power exponent
+  var scores = birds.map(function(b) { return Math.pow(b.count, 0.65); });
+  var scoreSum = scores.reduce(function(a, b) { return a + b; }, 0);
+
+  var A_MIN = 60 * 60;
+
+  // Derive sizes from normalized area budget
+  // Assume square aspect ratio for simplicity (cutout API returns roughly square)
+  var widths = scores.map(function(s) {
+    var area = Math.max(A_MIN, (B / scoreSum) * s);
+    return Math.round(Math.sqrt(area));
+  });
+
+  function tryLayout(scale) {
+    var ws = widths.map(function(w) { return Math.round(w * scale); });
+    var placed = [];
+
+    // Cost fn: horizontal bias b=2.1
+    function cost(dx, dy) {
+      return Math.sqrt(Math.pow(dx / 2.1, 2) + dy * dy);
+    }
+
+    function overlaps(nx, ny, nw, placedList) {
+      var pad = 4;
+      for (var p = 0; p < placedList.length; p++) {
+        var dx = Math.abs(nx - placedList[p].x);
+        var dy = Math.abs(ny - placedList[p].y);
+        var minX = (nw + placedList[p].w) / 2 + pad;
+        var minY = (nw + placedList[p].w) / 2 + pad;
+        if (dx < minX && dy < minY) return true;
+      }
+      return false;
+    }
+
+    function inBounds(x, y, w) {
+      return x - w/2 >= 0 && x + w/2 <= AW && y - w/2 >= 0 && y + w/2 <= AH;
+    }
+
+    var slots = [];
+    var ok = true;
+
+    for (var i = 0; i < birds.length; i++) {
+      var w = ws[i];
+      if (i === 0) {
+        if (!inBounds(CX, CY, w)) { ok = false; break; }
+        slots.push({ x: CX, y: CY, w: w });
+        placed.push({ x: CX, y: CY, w: w });
+        continue;
+      }
+
+      var bestSlot = null;
+      var bestCost = Infinity;
+
+      for (var angle = 0; angle < Math.PI * 30; angle += 0.15) {
+        var r = 8 * angle;
+        var a = angle + i * 2.399;
+        var tx = CX + r * Math.cos(a);
+        var ty = CY + r * Math.sin(a);
+        if (!inBounds(tx, ty, w)) continue;
+        if (overlaps(tx, ty, w, placed)) continue;
+        var c = cost(tx - CX, ty - CY);
+        if (c < bestCost) { bestCost = c; bestSlot = { x: tx, y: ty, w: w }; }
+        // Take first valid slot within a tight cost band for speed
+        if (bestSlot && angle > 1.0) break;
+      }
+
+      if (!bestSlot) { ok = false; break; }
+      slots.push(bestSlot);
+      placed.push(bestSlot);
+    }
+
+    return ok ? slots : null;
+  }
+
+  // Shrink loop: up to 10 iterations at 7% reduction each
+  var slots = null;
+  var scale = 1.0;
+  for (var attempt = 0; attempt < 10; attempt++) {
+    slots = tryLayout(scale);
+    if (slots) break;
+    scale *= 0.93;
+  }
+  if (!slots) return;
+
+  var BASE = "https://bird.onethreenine.net/avian/api/cutout.php";
+  var collage = document.getElementById("collage");
+
+  birds.forEach(function(bird, i) {
+    var slot = slots[i];
+    if (!slot) return;
+    var w = slot.w;
+
+    var tile = document.createElement("div");
+    tile.className = "bird-tile";
+    tile.style.left   = (slot.x - w/2) + "px";
+    tile.style.top    = (slot.y - w/2) + "px";
+    tile.style.width  = w + "px";
+    tile.style.height = (w + 10) + "px";
+
+    var img = document.createElement("img");
+    var sci = encodeURIComponent(bird.sciName);
+    var com = encodeURIComponent(bird.comName);
+    // Alternate poses: every 3rd bird gets in-flight (pose=2), rest perched (pose=1)
+    var pose = (i % 3 === 2) ? "2" : "1";
+    img.src    = BASE + "?sci=" + sci + "&com=" + com + "&pose=" + pose;
+    img.width  = w;
+    img.height = w;
+    img.alt    = bird.comName;
+    img.onerror = function() { tile.style.display = "none"; };
+
+    var label = document.createElement("div");
+    label.className = "bird-label";
+    label.textContent = bird.comName;
+    label.style.maxWidth = w + "px";
+
+    tile.appendChild(img);
+    tile.appendChild(label);
+    collage.appendChild(tile);
+  });
+});
+</script>
