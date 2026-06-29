@@ -5,7 +5,7 @@
     height: 480px;
     overflow: hidden;
     background: #fff;
-    font-family: 'Georgia', 'Times New Roman', serif;
+    font-family: var(--font-family);
   }
   #canvas {
     position: relative;
@@ -48,57 +48,151 @@
     display: flex;
     flex-direction: column;
     align-items: center;
+    gap: 6px;
   }
   .bird-tile img {
     display: block;
     object-fit: contain;
   }
   .bird-label {
-    font-size: 7px;
-    letter-spacing: 0.04em;
+    font-family: var(--font-family);
+    font-size: 13px;
+    font-weight: bold;
     text-align: center;
+    color: #000;
     line-height: 1.2;
     white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    color: #000;
-    margin-top: 2px;
   }
 </style>
 
 {%- assign CDN = "https://cdn.jsdelivr.net/gh/Twarner491/AvianVisitors@avian-visitors/avian/assets/illustrations/" -%}
 
-{%- assign cx_list    = "400,530,272,265,454,378,487,637,567,352,275,176" | split: "," -%}
-{%- assign cy_list    = "225,207,255,134,346,98,91,224,315,350,348,264"   | split: "," -%}
-{%- assign sz_list    = "120,114,108,101,95,89,83,77,71,64,58,52"         | split: "," -%}
-{%- assign flight_list = "0,0,1,0,1,0,0,1,0,1,0,0"                       | split: "," -%}
-
 <div id="canvas">
   <div id="title-bar">
     <span class="title">Avian Visitors</span>
-    <span class="subtitle">MECKLENBURG COUNTY · EBIRD · PAST 7 DAYS</span>
+    <span class="subtitle">HOME · EBIRD · PAST 7 DAYS</span>
   </div>
-  <div id="collage">
-    {%- for bird in birds limit: 12 -%}
-      {%- assign i      = forloop.index0 -%}
-      {%- assign sz     = sz_list[i]     | plus: 0 -%}
-      {%- assign cx     = cx_list[i]     | plus: 0 -%}
-      {%- assign cy     = cy_list[i]     | plus: 0 -%}
-      {%- assign flight = flight_list[i] -%}
-      {%- assign half   = sz | divided_by: 2 -%}
-      {%- assign left   = cx | minus: half -%}
-      {%- assign top    = cy | minus: half -%}
-      {%- assign tile_h = sz | plus: 14 -%}
-      {%- assign slug   = bird.sciName | downcase | replace: ' ', '-' -%}
-      {%- if flight == "1" -%}
-        {%- assign img_url = CDN | append: slug | append: '-2.png' -%}
-      {%- else -%}
-        {%- assign img_url = CDN | append: slug | append: '.png' -%}
-      {%- endif -%}
-      <div class="bird-tile" style="left:{{ left }}px;top:{{ top }}px;width:{{ sz }}px;height:{{ tile_h }}px;">
-        <img src="{{ img_url }}" width="{{ sz }}" height="{{ sz }}" alt="{{ bird.comName }}">
-        <div class="bird-label" style="max-width:{{ sz }}px;">{{ bird.comName }}</div>
-      </div>
-    {%- endfor -%}
-  </div>
+  <div id="collage"></div>
 </div>
+
+<div id="bird-data" style="display:none">{%- for bird in data limit: 100 -%}{{ bird.comName }}|{{ bird.sciName }}{% unless forloop.last %},{% endunless %}{%- endfor -%}</div>
+
+<script>
+(function () {
+  var CDN = "https://cdn.jsdelivr.net/gh/Twarner491/AvianVisitors@avian-visitors/avian/assets/illustrations/";
+  var AW = 800, AH = 450, CX = 400, CY = 225;
+
+  // 5 birds, bigger sizes
+  var SIZES = [200, 175, 155, 135, 115];
+  var LABEL_H = 22; // height reserved below each image for the name
+  var MAX_BIRDS = 5;
+
+  var raw = document.getElementById("bird-data").textContent.trim();
+  if (!raw) return;
+
+  var allBirds = raw.split(",").map(function(e) {
+    var p = e.split("|");
+    return { comName: p[0], sciName: p[1], slug: p[1].toLowerCase().replace(/ /g, "-") };
+  }).filter(function(b) { return b.comName && b.sciName; });
+
+  var checked = 0;
+  var validBirds = [];
+
+  function onAllChecked() {
+    if (validBirds.length === 0) return;
+
+    var birds = validBirds.slice(0, MAX_BIRDS);
+    var N = birds.length;
+
+    // Spiral placement — treat each tile as image + label block
+    var placed = [];
+
+    function overlaps(nx, ny, tw, th) {
+      var pad = 8;
+      for (var p = 0; p < placed.length; p++) {
+        var dx = Math.abs(nx - placed[p].x);
+        var dy = Math.abs(ny - placed[p].y);
+        if (dx < (tw + placed[p].w) / 2 + pad && dy < (th + placed[p].h) / 2 + pad) return true;
+      }
+      return false;
+    }
+
+    function inBounds(x, y, tw, th) {
+      return x - tw/2 >= 0 && x + tw/2 <= AW && y - th/2 >= 0 && y + th/2 <= AH;
+    }
+
+    var slots = [];
+    birds.forEach(function(bird, i) {
+      var w = SIZES[i] || SIZES[SIZES.length - 1];
+      var th = w + LABEL_H; // total tile height including label
+
+      if (i === 0) {
+        slots.push({x: CX, y: CY, w: w, h: th});
+        placed.push({x: CX, y: CY, w: w, h: th});
+        return;
+      }
+
+      for (var step = 0; step < 2000; step++) {
+        var angle = step * 0.2;
+        var r = 5 * angle;
+        var tx = CX + r * 1.6 * Math.cos(angle + i * 2.399);
+        var ty = CY + r * Math.sin(angle + i * 2.399);
+        if (!inBounds(tx, ty, w, th)) continue;
+        if (!overlaps(tx, ty, w, th)) {
+          slots.push({x: tx, y: ty, w: w, h: th});
+          placed.push({x: tx, y: ty, w: w, h: th});
+          return;
+        }
+      }
+      slots.push(null);
+    });
+
+    var collage = document.getElementById("collage");
+    birds.forEach(function(bird, i) {
+      var slot = slots[i];
+      if (!slot) return;
+      var w = slot.w;
+      var th = slot.h;
+
+      var tile = document.createElement("div");
+      tile.className = "bird-tile";
+      tile.style.cssText = "left:"+(slot.x-w/2)+"px;top:"+(slot.y-th/2)+"px;width:"+w+"px;height:"+th+"px;";
+
+      var img = document.createElement("img");
+      img.src = CDN + bird.slug + ".png";
+      img.width = w;
+      img.height = w;
+      img.alt = bird.comName;
+
+      var lbl = document.createElement("div");
+      lbl.className = "bird-label";
+      lbl.style.maxWidth = w + "px";
+      lbl.textContent = bird.comName;
+
+      tile.appendChild(img);
+      tile.appendChild(lbl);
+      collage.appendChild(tile);
+    });
+  }
+
+  allBirds.forEach(function(bird, i) {
+    var img = new Image();
+    img.onload = function() {
+      validBirds.push({ comName: bird.comName, sciName: bird.sciName, slug: bird.slug, order: i });
+      checked++;
+      if (checked === allBirds.length) {
+        validBirds.sort(function(a,b){ return a.order - b.order; });
+        onAllChecked();
+      }
+    };
+    img.onerror = function() {
+      checked++;
+      if (checked === allBirds.length) {
+        validBirds.sort(function(a,b){ return a.order - b.order; });
+        onAllChecked();
+      }
+    };
+    img.src = CDN + bird.slug + ".png";
+  });
+})();
+</script>
