@@ -7,6 +7,7 @@ Inspired by the open source project, Avian Visitors, this TRMNL plugin displays 
 1. Get an API key for free at ebird.org/api/keygen. Just sign in with your eBird account.
 2. Update the region currently set to US-NC-119 (Mecklenburg County, NC). To change, update the regionCode (US-NC-119) in the polling URL to your target region code.
    [Find your region here](https://documenter.getpostman.com/view/664302/S1ENwy59#07c64240-6359-4688-9c4f-ff3d678a7248)
+3. If you'd like to show more than 5 birds, simply adjust `MAX_BIRDS`
 
 **How it works**
 
@@ -16,7 +17,7 @@ Illustrations are fetched from the cutout API and rendered with the bird's commo
 
 **Plugin settings**
 
-Strategy: Polling | Polling URL: https://api.ebird.org/v2/data/obs/US-NC-119/recent?maxResults=50&back=7 | Polling Header: x-ebirdapitoken=YOUR_EBIRD_API_KEY | No-bleed padding: Yes
+Strategy: Polling | Polling URL: https://api.ebird.org/v2/data/obs/US-NC-119/recent?maxResults=1000&back=7 | Polling Header: x-ebirdapitoken=YOUR_EBIRD_API_KEY | No-bleed padding: Yes
 
 **Markup**
 
@@ -27,5 +28,3 @@ Bird positions are pre-computed using an Archimedean spiral algorithm with a hor
 **Image source**
 
 Bird illustrations are served from bird.onethreenine.net/avian/api/cutout.php, a custom cutout API built by Teddy Warner that returns woodblock-style kachō-e illustrations keyed by scientific and common name.
-
-Perched: ?sci={sciName}&com={comName}
