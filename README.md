@@ -4,10 +4,11 @@ Inspired by the open source project, [Avian Visitors](https://github.com/Twarner
 
 **What you need to do to customize for you**
 
-1. Get an API key for free at ebird.org/api/keygen. Just sign in with your eBird account.
-2. Update the region currently set to US-NC-119 (Mecklenburg County, NC). To change, update the regionCode (US-NC-119) in the polling URL to your target region code.
+1. Create a Private Plugin in TRMNL, use the plugin settings below and add the entire markup file under `Edit Markup` 
+2. Get an API key for free at ebird.org/api/keygen. Just sign in with your eBird account.
+3. Update the region currently set to US-NC-119 (Mecklenburg County, NC). To change, update the regionCode (US-NC-119) in the polling URL to your target region code.
    [Find your region here](https://documenter.getpostman.com/view/664302/S1ENwy59#07c64240-6359-4688-9c4f-ff3d678a7248)
-3. If you'd like to show more than 5 birds, simply adjust `MAX_BIRDS`
+4. If you'd like to show more than 5 birds, simply adjust `MAX_BIRDS`
 
 **How it works**
 
