@@ -1,21 +1,21 @@
 **Avian Visitors — TRMNL Plugin**
 
-A TRMNL OG private plugin that displays a spiral collage of recently spotted birds in Mecklenburg County, NC using eBird sighting data and woodblock-style bird illustrations.
+Inspired by the open source project, Avian Visitors, this TRMNL plugin displays 5 recently seen birds in your area as a collage using eBird sighting data and woodblock-style bird illustrations.
+
+**What you need to do to customize for you**
+
+1. Get an API key for free at ebird.org/api/keygen. Just sign in with your eBird account.
+2. Update region. It is currently set to US-NC-119 (Mecklenburg County, NC). To change region, update the regionCode in the polling URL to any valid eBird region code. [Find your region here](https://documenter.getpostman.com/view/664302/S1ENwy59#07c64240-6359-4688-9c4f-ff3d678a7248)
 
 **How it works**
 
-TRMNL polls the eBird API for recent bird observations in Mecklenburg County
-Up to 12 species are pulled, sorted by most recently reported
-Each bird is placed into a pre-computed spiral layout across the 800×480 ePaper canvas
+TRMNL polls the eBird API for recent bird observations in region
+5 species are pulled and eaach bird is placed into a pre-computed spiral layout across the 800×480 ePaper canvas
 Illustrations are fetched from the cutout API and rendered with the bird's common name below
 
 **Plugin settings**
 
-Strategy: Polling | Polling URL: https://api.ebird.org/v2/data/obs/US-NC-119/recent?maxResults=12&back=7 | Polling Header: x-ebirdapitoken=YOUR_EBIRD_API_KEY | No-bleed padding: Yes
-
-**Getting an eBird API key**
-
-Free at ebird.org/api/keygen. Just sign in with your eBird account.
+Strategy: Polling | Polling URL: https://api.ebird.org/v2/data/obs/US-NC-119/recent?maxResults=50&back=7 | Polling Header: x-ebirdapitoken=YOUR_EBIRD_API_KEY | No-bleed padding: Yes
 
 **Markup**
 
@@ -28,12 +28,3 @@ Bird positions are pre-computed using an Archimedean spiral algorithm with a hor
 Bird illustrations are served from bird.onethreenine.net/avian/api/cutout.php, a custom cutout API built by Teddy Warner that returns woodblock-style kachō-e illustrations keyed by scientific and common name.
 
 Perched: ?sci={sciName}&com={comName}
-In flight: ?sci={sciName}&com={comName}&pose=2
-
-**Region**
-
-Currently set to US-NC-119 (Mecklenburg County, NC). To change region, update the regionCode in the polling URL to any valid eBird region code.
-
-**Layout**
-
-Canvas: 800 × 480 px | Collage area: 800 × 450 px (below 30px title bar) | Max birds: 12 | Largest bird: 120px | Smallest bird: 52px | Spiral bias: Horizontal (x × 1.7)
