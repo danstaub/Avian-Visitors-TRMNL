@@ -1,6 +1,6 @@
 **Avian Visitors — TRMNL Plugin**
 
-Inspired by the open source project, Avian Visitors, this TRMNL plugin displays 5 recently seen birds in your area as a collage using eBird sighting data and woodblock-style bird illustrations.
+Inspired by the open source project, [Avian Visitors](https://github.com/Twarner491/AvianVisitors/tree/avian-visitors), this TRMNL plugin displays 5 recently seen birds in your area as a collage using eBird sighting data and woodblock-style bird illustrations.
 
 **What you need to do to customize for you**
 
@@ -12,18 +12,20 @@ Inspired by the open source project, Avian Visitors, this TRMNL plugin displays 
 **How it works**
 
 TRMNL polls the eBird API for recent bird observations in region
+
 5 species are pulled and eaach bird is placed into a pre-computed spiral layout across the 800×480 ePaper canvas
+
 Illustrations are fetched from the cutout API and rendered with the bird's common name below
 
 **Plugin settings**
 
-Strategy: Polling | Polling URL: https://api.ebird.org/v2/data/obs/US-NC-119/recent?maxResults=1000&back=7 | Polling Header: x-ebirdapitoken=YOUR_EBIRD_API_KEY | No-bleed padding: Yes
+Strategy: Polling
 
-**Markup**
+Polling URL: https://api.ebird.org/v2/data/obs/US-NC-119/recent?maxResults=1000&back=7
 
-The plugin uses pure Liquid — no JavaScript — so that TRMNL's screenshot renderer captures all birds before taking the image for the device.
+Polling Header: x-ebirdapitoken=YOUR_EBIRD_API_KEY
 
-Bird positions are pre-computed using an Archimedean spiral algorithm with a horizontal bias (x × 1.7) to fill the landscape canvas naturally. The largest bird (most recently reported) is placed at center, with sizes stepping down from 120px to 52px as you move outward.
+No-bleed padding: Yes
 
 **Image source**
 
