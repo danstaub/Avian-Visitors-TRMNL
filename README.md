@@ -31,3 +31,5 @@ No-bleed padding: Yes
 **Image source**
 
 Bird illustrations are served from bird.onethreenine.net/avian/api/cutout.php, a custom cutout API built by Teddy Warner that returns woodblock-style kachō-e illustrations keyed by scientific and common name.
+
+![Avian Visitors Preview](./preview.png)
